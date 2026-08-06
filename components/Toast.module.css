@@ -1,0 +1,65 @@
+.toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 12px 18px;
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  font-size: 14px;
+  font-weight: 500;
+  max-width: 90vw;
+  width: max-content;
+  animation: slideDown 0.25s ease;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -20px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.success {
+  background: #00B894;
+  color: #ffffff;
+}
+
+.error {
+  background: var(--color-error);
+  color: #ffffff;
+}
+
+.warning {
+  background: #D97706;
+  color: #ffffff;
+}
+
+.info {
+  background: var(--color-primary-container);
+  color: #ffffff;
+}
+
+.closeBtn {
+  background: transparent;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.8;
+  padding: 2px;
+}
+
+.closeBtn:hover {
+  opacity: 1;
+}

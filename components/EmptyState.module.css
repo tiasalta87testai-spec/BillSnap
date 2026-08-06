@@ -1,0 +1,33 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-xl) var(--space-md);
+  text-align: center;
+  gap: var(--space-md);
+  background: var(--color-surface-container-lowest);
+  border: 1px dashed var(--color-border-card);
+  border-radius: var(--radius-xl);
+  margin: var(--space-md) 0;
+}
+
+.iconWrapper {
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-container);
+  color: var(--color-on-surface-variant);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.title {
+  color: var(--color-on-surface);
+}
+
+.description {
+  color: var(--color-on-surface-variant);
+  max-width: 320px;
+}
