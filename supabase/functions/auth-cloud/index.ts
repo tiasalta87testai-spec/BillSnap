@@ -10,7 +10,7 @@ Deno.serve(async (req: Request) => {
   const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
 
   const redirectUri = `${supabaseUrl}/functions/v1/auth-cloud`;
-  const frontendAdminUrl = 'http://localhost:3000/admin';
+  const frontendAdminUrl = (Deno.env.get('FRONTEND_URL') || 'http://localhost:3000') + '/admin';
 
   // 1. Avvio flusso OAuth Google con scope per consultazione cartelle e creazione file
   if (action === 'authorize') {

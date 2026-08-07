@@ -90,8 +90,20 @@ export default function HomePage() {
         />
       ) : (
         <div>
-          <header style={{ marginBottom: '24px', textAlign: 'center' }}>
-            <h1 className="display" style={{ color: 'var(--color-primary-container)' }}>
+          <header style={{ marginBottom: '24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/logo.png"
+              alt="BillSnap Logo"
+              style={{
+                width: '72px',
+                height: '72px',
+                objectFit: 'contain',
+                marginBottom: '12px',
+                filter: 'drop-shadow(0 4px 16px rgba(59, 130, 246, 0.45))'
+              }}
+            />
+            <h1 className="display" style={{ color: 'var(--color-primary-container)', background: 'linear-gradient(135deg, #60a5fa 0%, #2563eb 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>
               BillSnap
             </h1>
             <p className="body-md" style={{ color: 'var(--color-on-surface-variant)', marginTop: '4px' }}>

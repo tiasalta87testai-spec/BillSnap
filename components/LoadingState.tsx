@@ -19,7 +19,8 @@ export default function LoadingState({
       <div className={styles.spinnerWrapper}>
         <div className={styles.spinner} />
         <div className={styles.iconOverlay}>
-          <Sparkles size={28} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo.png" alt="BillSnap Logo" style={{ width: '36px', height: '36px', objectFit: 'contain' }} />
         </div>
       </div>
 
