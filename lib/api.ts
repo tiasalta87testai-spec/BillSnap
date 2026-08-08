@@ -72,4 +72,10 @@ export const api = {
 
   adminCreateDriveFolder: (folderName: string, userToken?: string) =>
     callEdgeFunction<{ success: boolean; folder: { id: string; name: string; path: string } }>('admin-manage-users', { action: 'create_drive_folder', folder_name: folderName }, false, userToken),
+
+  adminListUnsyncedReceipts: (userToken?: string) =>
+    callEdgeFunction<{ unsynced: Array<{ id: string; vendor_name: string; total_amount: number; receipt_date: string; cloud_sync_status: string; created_at: string }> }>('admin-manage-users', { action: 'list_unsynced_receipts' }, false, userToken),
+
+  adminRetryCloudSync: (receiptId?: string, userToken?: string) =>
+    callEdgeFunction<{ success: boolean; processed: number; synced: number }>('admin-manage-users', { action: 'retry_cloud_sync', receipt_id: receiptId }, false, userToken),
 };

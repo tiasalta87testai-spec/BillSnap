@@ -10,7 +10,7 @@ import Toast, { ToastMessage } from '@/components/Toast';
 import { Receipt } from '@/lib/types';
 import { supabase } from '@/lib/supabase';
 import { formatCurrency } from '@/lib/format';
-import { Receipt as ReceiptIcon, RefreshCw } from 'lucide-react';
+import { Download, RefreshCw } from 'lucide-react';
 
 export default function HistoryPage() {
   const [receipts, setReceipts] = useState<Receipt[]>([]);
@@ -19,6 +19,8 @@ export default function HistoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [pageLimit, setPageLimit] = useState(20);
+  const [hasMore, setHasMore] = useState(false);
   const [toast, setToast] = useState<ToastMessage | null>(null);
 
   const fetchReceipts = useCallback(async () => {
@@ -43,13 +45,19 @@ export default function HistoryPage() {
         query = query.lte('receipt_date', endDate);
       }
 
-      const { data, error } = await query.limit(50);
+      const { data, error } = await query.limit(pageLimit + 1);
 
       if (error) {
         throw error;
       }
 
-      setReceipts(data || []);
+      if (data && data.length > pageLimit) {
+        setHasMore(true);
+        setReceipts(data.slice(0, pageLimit));
+      } else {
+        setHasMore(false);
+        setReceipts(data || []);
+      }
     } catch (err: unknown) {
       console.error('Errore durante il recupero dello storico:', err);
       const msg = err instanceof Error ? err.message : 'Errore nel caricamento delle ricevute';
@@ -58,7 +66,7 @@ export default function HistoryPage() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [searchQuery, startDate, endDate]);
+  }, [searchQuery, startDate, endDate, pageLimit]);
 
   useEffect(() => {
     fetchReceipts();
@@ -74,10 +82,42 @@ export default function HistoryPage() {
     setEndDate('');
   };
 
+  const handleLoadMore = () => {
+    setPageLimit(prev => prev + 20);
+  };
+
+  const exportToCSV = () => {
+    if (receipts.length === 0) return;
+
+    const headers = ['ID', 'Data', 'Esercente', 'Categoria', 'Importo Totale (€)', 'Metodo Pagamento', 'Note', 'Stato Backup Cloud', 'Link Cloud'];
+    const rows = receipts.map(r => [
+      `"${r.id}"`,
+      `"${r.receipt_date || ''}"`,
+      `"${(r.vendor_name || '').replace(/"/g, '""')}"`,
+      `"${(r.category || '').replace(/"/g, '""')}"`,
+      r.total_amount ? r.total_amount.toFixed(2) : '0.00',
+      `"${(r.payment_method || '').replace(/"/g, '""')}"`,
+      `"${(r.notes || '').replace(/"/g, '""')}"`,
+      `"${r.cloud_sync_status || 'pending'}"`,
+      `"${r.cloud_file_url || ''}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(';'), ...rows.map(e => e.join(';'))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `BillSnap_Export_Spese_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    setToast({ id: 'csv-ok', type: 'success', text: `Esportati ${receipts.length} scontrini in CSV con successo!` });
+  };
+
   const totalSum = receipts.reduce((acc, curr) => acc + (curr.total_amount || 0), 0);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', paddingBottom: '80px' }}>
       <Toast toast={toast} onDismiss={() => setToast(null)} />
 
       {/* HEADER E CONTATORE */}
@@ -85,15 +125,36 @@ export default function HistoryPage() {
         <div>
           <h1 className="headline-lg">Storico Ricevute</h1>
           <p className="body-md" style={{ color: 'var(--color-on-surface-variant)', marginTop: '2px' }}>
-            {isLoading ? 'Caricamento...' : `${receipts.length} ricevute trovate`}
+            {isLoading ? 'Caricamento...' : `${receipts.length} ricevute visualizzate`}
           </p>
         </div>
         {!isLoading && receipts.length > 0 && (
-          <div style={{ textAlign: 'right' }}>
-            <span className="label-sm" style={{ color: 'var(--color-on-surface-variant)' }}>TOTALE SPESO</span>
-            <div className="headline-md tabular-nums" style={{ color: 'var(--color-primary-container)' }}>
-              {formatCurrency(totalSum)}
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+            <div style={{ textAlign: 'right' }}>
+              <span className="label-sm" style={{ color: 'var(--color-on-surface-variant)' }}>TOTALE PARZIALE</span>
+              <div className="headline-md tabular-nums" style={{ color: 'var(--color-primary-container)' }}>
+                {formatCurrency(totalSum)}
+              </div>
             </div>
+            <button
+              onClick={exportToCSV}
+              style={{
+                padding: '6px 12px',
+                fontSize: '12px',
+                fontWeight: 600,
+                borderRadius: '8px',
+                border: 'none',
+                backgroundColor: '#2563eb',
+                color: '#fff',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <Download size={14} />
+              Esporta CSV
+            </button>
           </div>
         )}
       </header>
@@ -115,7 +176,7 @@ export default function HistoryPage() {
       </div>
 
       {/* LISTA RICEVUTE */}
-      {isLoading && (
+      {isLoading && pageLimit === 20 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           <SkeletonCard />
           <SkeletonCard />
@@ -142,6 +203,30 @@ export default function HistoryPage() {
           {receipts.map((receipt) => (
             <ReceiptCard key={receipt.id} receipt={receipt} />
           ))}
+
+          {hasMore && (
+            <button
+              onClick={handleLoadMore}
+              disabled={isLoading}
+              style={{
+                padding: '12px',
+                fontSize: '14px',
+                fontWeight: 600,
+                borderRadius: '10px',
+                border: '1px solid var(--color-border-card, #1e293b)',
+                backgroundColor: 'var(--color-surface-container, #131d33)',
+                color: '#60a5fa',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                marginTop: '12px',
+              }}
+            >
+              {isLoading ? 'Caricamento altri...' : 'Carica Altri Scontrini'}
+            </button>
+          )}
         </div>
       )}
     </div>

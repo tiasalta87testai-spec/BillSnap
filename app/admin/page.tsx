@@ -23,6 +23,10 @@ export default function AdminPage() {
   const [newFolderName, setNewFolderName] = useState('');
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
 
+  const [unsyncedReceipts, setUnsyncedReceipts] = useState<Array<{ id: string; vendor_name: string; total_amount: number; receipt_date: string; cloud_sync_status: string; created_at: string }>>([]);
+  const [loadingUnsynced, setLoadingUnsynced] = useState(false);
+  const [retryingSync, setRetryingSync] = useState(false);
+
   const fetchUsers = async () => {
     setLoading(true);
     setError(null);
@@ -34,6 +38,34 @@ export default function AdminPage() {
       setError('Impossibile caricare la lista utenti. Assicurati di essere collegato come Admin.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadUnsyncedReceipts = async () => {
+    setLoadingUnsynced(true);
+    try {
+      const res = await api.adminListUnsyncedReceipts();
+      setUnsyncedReceipts(res.unsynced || []);
+    } catch (err) {
+      console.error('Error loading unsynced receipts:', err);
+    } finally {
+      setLoadingUnsynced(false);
+    }
+  };
+
+  const handleRetrySyncAll = async () => {
+    setRetryingSync(true);
+    try {
+      const res = await api.adminRetryCloudSync();
+      if (res.success) {
+        setCloudMessage({ text: `Risincronizzazione completata! (${res.synced}/${res.processed} ricevute caricate su Google Drive)`, isError: false });
+        loadUnsyncedReceipts();
+      }
+    } catch (err: any) {
+      console.error('Error retrying sync:', err);
+      setCloudMessage({ text: err.message || 'Errore durante la risincronizzazione', isError: true });
+    } finally {
+      setRetryingSync(false);
     }
   };
 
@@ -52,6 +84,7 @@ export default function AdminPage() {
         setHasCredentials(connected);
         if (connected && res.cloud_settings.provider === 'drive') {
           loadDriveFolders();
+          loadUnsyncedReceipts();
         }
       }
     } catch (err) {
@@ -472,6 +505,73 @@ export default function AdminPage() {
             {cloudLoading ? 'Salvataggio in corso...' : 'Salva Configurazione Cloud'}
           </button>
         </form>
+
+        {/* SEZIONE RISINCRONIZZAZIONE RICEVUTE PENDING / FAILED */}
+        <div style={{ marginTop: '24px', paddingTop: '18px', borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div>
+              <h3 style={{ fontSize: '14px', fontWeight: 600, margin: 0 }}>
+                Ricevute Non Sincronizzate ({unsyncedReceipts.length})
+              </h3>
+              <p style={{ fontSize: '12px', color: '#94a3b8', margin: '2px 0 0 0' }}>
+                Scontrini con backup in sospeso o fallito
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button
+                type="button"
+                onClick={loadUnsyncedReceipts}
+                style={{ background: 'transparent', border: 'none', color: '#60a5fa', fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                <RefreshCw size={12} className={loadingUnsynced ? 'spin' : ''} />
+                Aggiorna
+              </button>
+              {unsyncedReceipts.length > 0 && (
+                <button
+                  type="button"
+                  disabled={retryingSync}
+                  onClick={handleRetrySyncAll}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    borderRadius: '6px',
+                    border: 'none',
+                    backgroundColor: '#10b981',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                  }}
+                >
+                  <RefreshCw size={12} className={retryingSync ? 'spin' : ''} />
+                  {retryingSync ? 'Sincronizzazione...' : 'Risincronizza Tutte'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {unsyncedReceipts.length === 0 ? (
+            <div style={{ fontSize: '13px', color: '#10b981', background: 'rgba(16, 185, 129, 0.08)', padding: '10px 12px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.2)' }}>
+              ✓ Tutti i tuoi scontrini sono regolarmente sincronizzati su Google Drive!
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '180px', overflowY: 'auto' }}>
+              {unsyncedReceipts.map((r) => (
+                <div key={r.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.05)', fontSize: '12px' }}>
+                  <div>
+                    <span style={{ fontWeight: 600 }}>{r.vendor_name}</span> - {r.total_amount} € ({r.receipt_date})
+                  </div>
+                  <span style={{ fontSize: '11px', color: r.cloud_sync_status === 'failed' ? '#ef4444' : '#f59e0b', padding: '2px 6px', borderRadius: '4px', background: 'rgba(255,255,255,0.05)' }}>
+                    {r.cloud_sync_status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </section>
     </div>
   );

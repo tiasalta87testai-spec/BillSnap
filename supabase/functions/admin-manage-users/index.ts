@@ -3,6 +3,123 @@ import { getServiceClient, getAuthenticatedUser } from '../_shared/supabase.ts';
 import { jsonResponse, errorResponse } from '../_shared/response.ts';
 import { checkRateLimit } from '../_shared/rate-limit.ts';
 
+async function syncSingleReceiptToDrive(supabase: any, cloudSetting: any, receipt: any) {
+  try {
+    let { access_token, refresh_token, expires_at } = cloudSetting.credentials;
+    const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+    const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
+
+    if (expires_at && Date.now() >= expires_at - 60000 && refresh_token && clientId && clientSecret) {
+      const refreshResp = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          refresh_token,
+          client_id: clientId,
+          client_secret: clientSecret,
+          grant_type: 'refresh_token',
+        }),
+      });
+
+      const refreshData = await refreshResp.json();
+      if (refreshData.access_token) {
+        access_token = refreshData.access_token;
+        const newCredentials = {
+          ...cloudSetting.credentials,
+          access_token,
+          expires_at: Date.now() + (refreshData.expires_in * 1000),
+        };
+        await supabase
+          .from('cloud_settings')
+          .update({ credentials: newCredentials, updated_at: new Date().toISOString() })
+          .eq('id', cloudSetting.id);
+      }
+    }
+
+    if (!access_token) return false;
+
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from('receipts-images')
+      .download(receipt.image_path);
+
+    if (downloadError || !fileData) {
+      console.error('Error downloading image for Drive sync:', downloadError);
+      await supabase.from('receipts').update({ cloud_sync_status: 'failed' }).eq('id', receipt.id);
+      return false;
+    }
+
+    const fileBuffer = await fileData.arrayBuffer();
+    const fileName = `${receipt.receipt_date || 'nodate'}_${(receipt.vendor_name || 'ricevuta').replace(/[^a-zA-Z0-9]/g, '_')}_${receipt.id.substring(0, 8)}.jpg`;
+
+    let parentFolderId: string | undefined = cloudSetting.credentials?.backup_folder_id || undefined;
+    if (!parentFolderId && cloudSetting.backup_path) {
+      const folderNameClean = cloudSetting.backup_path.replace(/^\/+|\/+$/g, '').split('/').pop();
+      if (folderNameClean) {
+        const searchResp = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q=mimeType%3D'application%2Fvnd.google-apps.folder'+and+name%3D'${encodeURIComponent(folderNameClean)}'+and+trashed%3Dfalse`,
+          { headers: { Authorization: `Bearer ${access_token}` } }
+        );
+        const searchData = await searchResp.json();
+        if (searchData.files && searchData.files.length > 0) {
+          parentFolderId = searchData.files[0].id;
+        }
+      }
+    }
+
+    const metadata: Record<string, any> = {
+      name: fileName,
+      mimeType: 'image/jpeg',
+    };
+    if (parentFolderId) {
+      metadata.parents = [parentFolderId];
+    }
+
+    const boundary = 'foo_bar_baz';
+    const delimiter = `\r\n--${boundary}\r\n`;
+    const closeDelimiter = `\r\n--${boundary}--`;
+    const metadataHeaders = 'Content-Type: application/json; charset=UTF-8\r\n\r\n';
+    const mediaHeaders = 'Content-Type: image/jpeg\r\n\r\n';
+
+    const enc = new TextEncoder();
+    const part1 = enc.encode(delimiter + metadataHeaders + JSON.stringify(metadata) + delimiter + mediaHeaders);
+    const part2 = new Uint8Array(fileBuffer);
+    const part3 = enc.encode(closeDelimiter);
+
+    const fullBody = new Uint8Array(part1.length + part2.length + part3.length);
+    fullBody.set(part1, 0);
+    fullBody.set(part2, part1.length);
+    fullBody.set(part3, part1.length + part2.length);
+
+    const driveResp = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${access_token}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`,
+      },
+      body: fullBody,
+    });
+
+    const driveData = await driveResp.json();
+    if (driveData.id) {
+      await supabase
+        .from('receipts')
+        .update({
+          cloud_sync_status: 'synced',
+          cloud_file_id: driveData.id,
+          cloud_file_url: `https://drive.google.com/file/d/${driveData.id}/view`,
+        })
+        .eq('id', receipt.id);
+      return true;
+    } else {
+      await supabase.from('receipts').update({ cloud_sync_status: 'failed' }).eq('id', receipt.id);
+      return false;
+    }
+  } catch (err) {
+    console.error('Error in syncSingleReceiptToDrive:', err);
+    return false;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   const corsResponse = handleCors(req);
   if (corsResponse) return corsResponse;
@@ -158,7 +275,6 @@ Deno.serve(async (req: Request) => {
       const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
       const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
 
-      // Refresh token se scaduto
       if (expires_at && Date.now() >= expires_at - 60000 && refresh_token && clientId && clientSecret) {
         const refreshResp = await fetch('https://oauth2.googleapis.com/token', {
           method: 'POST',
@@ -186,7 +302,6 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Query Google Drive API chiedendo id, name e genitori (parents) per comporre i percorsi gerarchici completi
       const driveResp = await fetch(
         "https://www.googleapis.com/drive/v3/files?q=mimeType%3D'application%2Fvnd.google-apps.folder'+and+trashed%3Dfalse&fields=files(id%2Cname%2Cparents)&pageSize=100",
         {
@@ -276,6 +391,59 @@ Deno.serve(async (req: Request) => {
       } else {
         return errorResponse(req, 'Errore nella creazione della cartella su Google Drive', 500, 'DRIVE_ERROR');
       }
+    }
+
+    if (action === 'list_unsynced_receipts') {
+      const { data: unsynced, error } = await supabase
+        .from('receipts')
+        .select('id, vendor_name, total_amount, receipt_date, cloud_sync_status, created_at')
+        .neq('cloud_sync_status', 'synced')
+        .neq('status', 'deleted')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching unsynced receipts:', error);
+        return errorResponse(req, 'Errore nel recupero ricevute non sincronizzate', 500, 'DB_ERROR');
+      }
+
+      return jsonResponse(req, { unsynced: unsynced || [] });
+    }
+
+    if (action === 'retry_cloud_sync') {
+      const { receipt_id } = body;
+      const { data: cloudSetting } = await supabase
+        .from('cloud_settings')
+        .select('*')
+        .eq('provider', 'drive')
+        .limit(1)
+        .maybeSingle();
+
+      if (!cloudSetting || !cloudSetting.credentials) {
+        return errorResponse(req, 'Google Drive non collegato', 400, 'DRIVE_NOT_CONNECTED');
+      }
+
+      let query = supabase
+        .from('receipts')
+        .select('*')
+        .neq('cloud_sync_status', 'synced')
+        .neq('status', 'deleted');
+
+      if (receipt_id) {
+        query = query.eq('id', receipt_id);
+      }
+
+      const { data: targets, error: targetErr } = await query;
+      if (targetErr || !targets) {
+        return errorResponse(req, 'Nessuna ricevuta da risincronizzare', 404, 'NOT_FOUND');
+      }
+
+      let syncedCount = 0;
+      for (const item of targets) {
+        const ok = await syncSingleReceiptToDrive(supabase, cloudSetting, item);
+        if (ok) syncedCount++;
+      }
+
+      return jsonResponse(req, { success: true, processed: targets.length, synced: syncedCount });
     }
 
     return errorResponse(req, 'Azione non riconosciuta', 400, 'INVALID_ACTION');
