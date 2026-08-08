@@ -25,12 +25,14 @@ export async function GET(request: Request) {
 
       if (data.session) {
         const response = NextResponse.redirect(new URL('/login?status=success', request.url));
-        response.cookies.set('sb-auth-token', JSON.stringify(data.session), {
+        // Imposta solo il token di accesso leggero (JWT) per evitare l'errore HTTP 431
+        response.cookies.set('sb-access-token', data.session.access_token, {
           path: '/',
           maxAge: 60 * 60 * 24 * 30, // 30 giorni
           sameSite: 'lax',
           secure: true
         });
+        response.cookies.delete('sb-auth-token'); // Pulisce preventivamente quello vecchio
         return response;
       }
     }
@@ -45,15 +47,15 @@ export async function GET(request: Request) {
 
       if (data.session) {
         const response = NextResponse.redirect(new URL('/login?status=success', request.url));
-        response.cookies.set('sb-auth-token', JSON.stringify(data.session), {
+        response.cookies.set('sb-access-token', data.session.access_token, {
           path: '/',
           maxAge: 60 * 60 * 24 * 30,
           sameSite: 'lax',
           secure: true
         });
+        response.cookies.delete('sb-auth-token');
         return response;
       } else {
-        // Se non viene creata una sessione immediata, reindirizza comunque confermando il successo
         return NextResponse.redirect(new URL('/login?status=success', request.url));
       }
     }

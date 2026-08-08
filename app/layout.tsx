@@ -2,6 +2,7 @@ import './globals.css';
 import React from 'react';
 import type { Metadata, Viewport } from 'next';
 import BottomNav from '@/components/BottomNav';
+import SessionSync from '@/components/SessionSync';
 
 export const metadata: Metadata = {
   title: 'BillSnap - Scontrini Digitali AI',
@@ -38,6 +39,7 @@ export default function RootLayout({
   return (
     <html lang="it">
       <body>
+        <SessionSync />
         <main style={{ maxWidth: '600px', margin: '0 auto', padding: '16px 20px 24px' }}>
           {children}
         </main>
