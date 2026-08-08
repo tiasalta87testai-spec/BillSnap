@@ -4,44 +4,65 @@ import { createClient } from '@supabase/supabase-js';
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url);
   const code = requestUrl.searchParams.get('code');
+  const token_hash = requestUrl.searchParams.get('token_hash');
+  const type = requestUrl.searchParams.get('type');
 
-  if (code) {
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-    const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 
-    // Client Supabase temporaneo per lo scambio del code server-side
-    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        persistSession: false
-      }
-    });
+  // Client Supabase temporaneo per lo scambio dei token server-side
+  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+    auth: {
+      persistSession: false
+    }
+  });
 
-    try {
+  try {
+    // 1. Caso Flusso OAuth2 (es: Accedi con Google che restituisce 'code')
+    if (code) {
       const { data, error } = await supabase.auth.exchangeCodeForSession(code);
-      
       if (error) throw error;
 
       if (data.session) {
-        // Creiamo la risposta di redirect per il login riuscito
         const response = NextResponse.redirect(new URL('/login?status=success', request.url));
-        
-        // Impostiamo il cookie sb-auth-token per renderlo leggibile al middleware e al client
-        const sessionString = JSON.stringify(data.session);
-        response.cookies.set('sb-auth-token', sessionString, {
+        response.cookies.set('sb-auth-token', JSON.stringify(data.session), {
           path: '/',
           maxAge: 60 * 60 * 24 * 30, // 30 giorni
           sameSite: 'lax',
           secure: true
         });
-        
         return response;
       }
-    } catch (err: any) {
-      console.error('Error exchanging OAuth code for session:', err);
-      const errMsg = encodeURIComponent(err.message || 'Errore durante lo scambio del codice di sessione');
-      return NextResponse.redirect(new URL(`/login?error=${errMsg}`, request.url));
     }
+
+    // 2. Caso Flusso di Conferma Email (che restituisce 'token_hash' e 'type')
+    if (token_hash && type) {
+      const { data, error } = await supabase.auth.verifyOtp({
+        token_hash,
+        type: type as any,
+      });
+      if (error) throw error;
+
+      if (data.session) {
+        const response = NextResponse.redirect(new URL('/login?status=success', request.url));
+        response.cookies.set('sb-auth-token', JSON.stringify(data.session), {
+          path: '/',
+          maxAge: 60 * 60 * 24 * 30,
+          sameSite: 'lax',
+          secure: true
+        });
+        return response;
+      } else {
+        // Se non viene creata una sessione immediata, reindirizza comunque confermando il successo
+        return NextResponse.redirect(new URL('/login?status=success', request.url));
+      }
+    }
+  } catch (err: any) {
+    console.error('Error in auth callback:', err);
+    const errMsg = encodeURIComponent(err.message || 'Errore durante la convalida della sessione');
+    return NextResponse.redirect(new URL(`/login?error=${errMsg}`, request.url));
   }
 
-  return NextResponse.redirect(new URL('/login?error=Codice%20di%20autenticazione%20mancante', request.url));
+  // Se mancano entrambi i parametri
+  return NextResponse.redirect(new URL('/login?error=Parametri%20di%20autenticazione%20non%20validi%20o%20mancanti', request.url));
 }
