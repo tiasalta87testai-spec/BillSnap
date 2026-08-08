@@ -2,20 +2,28 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
-  const path = request.nextUrl.pathname;
+  const tokenCookie = request.cookies.get('sb-auth-token');
+  const { pathname } = request.nextUrl;
 
-  // Rotte protette che richiedono controllo sessione
-  const isProtectedPath = path.startsWith('/admin') || path.startsWith('/stats') || path.startsWith('/history');
+  // Definiamo le rotte pubbliche che non richiedono autenticazione
+  const isPublicRoute = pathname === '/login' || pathname.startsWith('/auth/callback');
 
-  if (isProtectedPath) {
-    // Gestione cookie/header auth se necessario
-    // Per dev / anonymous passiamo avanti regolarmente
-    return NextResponse.next();
+  // Se l'utente NON è autenticato e prova ad accedere a una rotta protetta
+  if (!tokenCookie && !isPublicRoute) {
+    return NextResponse.redirect(new URL('/login', request.url));
+  }
+
+  // Se l'utente è autenticato e prova ad accedere a /login, lo rimandiamo in Home
+  if (tokenCookie && pathname === '/login') {
+    return NextResponse.redirect(new URL('/', request.url));
   }
 
   return NextResponse.next();
 }
 
+// Esclude il controllo sui file statici, immagini, icone e favicon
 export const config = {
-  matcher: ['/admin/:path*', '/stats/:path*', '/history/:path*'],
+  matcher: [
+    '/((?!api|_next/static|_next/image|favicon.ico|logo.png|.*\\.png|.*\\.jpg|.*\\.jpeg|.*\\.svg).*)',
+  ],
 };

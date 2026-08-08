@@ -1,5 +1,5 @@
 import { handleCors } from '../_shared/cors.ts';
-import { getServiceClient } from '../_shared/supabase.ts';
+import { getServiceClient, getAuthenticatedUser } from '../_shared/supabase.ts';
 import { jsonResponse, errorResponse } from '../_shared/response.ts';
 import { checkRateLimit } from '../_shared/rate-limit.ts';
 
@@ -13,17 +13,23 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return errorResponse(req, 'Utente non autenticato. Accesso negato.', 401, 'UNAUTHORIZED');
+    }
+
     const { id } = await req.json();
 
     if (!id) return errorResponse(req, 'ID mancante', 400, 'ID_MISSING');
 
     const supabase = getServiceClient();
 
-    // 1. Recupera record per ottenere path file
+    // 1. Recupera record per ottenere path file (assicurando la proprietà dell'utente)
     const { data: receipt, error: selectError } = await supabase
       .from('receipts')
       .select('image_path, thumbnail_path')
       .eq('id', id)
+      .eq('user_id', user.id)
       .single();
 
     if (selectError || !receipt) {
@@ -45,11 +51,12 @@ Deno.serve(async (req: Request) => {
       console.warn('Storage delete warning (non-blocking):', storageError);
     }
 
-    // 3. Elimina record da DB
+    // 3. Elimina record da DB (sicuro)
     const { error: deleteError } = await supabase
       .from('receipts')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', user.id);
 
     if (deleteError) {
       console.error('Delete error:', deleteError);

@@ -3,11 +3,26 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { UserProfile, UserRole } from '@/lib/types';
-import { ShieldCheck, Users, Cloud, CheckCircle2, AlertCircle, RefreshCw, ExternalLink, Folder, Plus } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import { useRouter } from 'next/navigation';
+import { ShieldCheck, Users, Cloud, CheckCircle2, AlertCircle, RefreshCw, ExternalLink, Folder, Plus, LogOut } from 'lucide-react';
 
 export default function AdminPage() {
+  const router = useRouter();
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const handleLogout = async () => {
+    if (confirm('Sei sicuro di voler uscire da BillSnap?')) {
+      try {
+        const { error } = await supabase.auth.signOut();
+        if (error) throw error;
+        window.location.href = '/login';
+      } catch (err) {
+        console.error('Error logging out:', err);
+      }
+    }
+  };
   const [error, setError] = useState<string | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [cloudActive, setCloudActive] = useState(false);
@@ -179,14 +194,36 @@ export default function AdminPage() {
 
   return (
     <div style={{ paddingBottom: '80px' }}>
-      <header style={{ marginBottom: '24px' }}>
-        <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <ShieldCheck style={{ color: 'var(--color-primary, #60a5fa)' }} />
-          Pannello Amministrazione
-        </h1>
-        <p style={{ color: 'var(--color-secondary, #94a3b8)', margin: 0, fontSize: '14px' }}>
-          Gestione utenti, ruoli e backup automatico cloud
-        </p>
+      <header style={{ marginBottom: '24px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <h1 style={{ fontSize: '24px', fontWeight: 700, margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <ShieldCheck style={{ color: 'var(--color-primary, #60a5fa)' }} />
+            Pannello Amministrazione
+          </h1>
+          <p style={{ color: 'var(--color-secondary, #94a3b8)', margin: 0, fontSize: '14px' }}>
+            Gestione utenti, ruoli e backup automatico cloud
+          </p>
+        </div>
+        <button
+          onClick={handleLogout}
+          style={{
+            background: 'rgba(239, 68, 68, 0.15)',
+            border: '1px solid rgba(239, 68, 68, 0.3)',
+            borderRadius: '10px',
+            color: '#f87171',
+            padding: '8px 14px',
+            fontSize: '13px',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'background 0.2s'
+          }}
+        >
+          <LogOut size={14} />
+          Esci
+        </button>
       </header>
 
       {/* SEZIONE GESTIONE UTENTI */}

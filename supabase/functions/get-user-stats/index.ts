@@ -14,17 +14,18 @@ Deno.serve(async (req: Request) => {
 
   try {
     const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return errorResponse(req, 'Utente non autenticato. Accesso negato.', 401, 'UNAUTHORIZED');
+    }
+
     const supabase = getServiceClient();
 
-    // Costruisce la query base filtrando ricevute non eliminate
-    let query = supabase
+    // Costruisce la query base filtrando ricevute non eliminate (isolate per utente)
+    const query = supabase
       .from('receipts')
       .select('id, receipt_date, total_amount, category, group_id, receipt_groups(id, name, color)')
-      .neq('status', 'deleted');
-
-    if (user) {
-      query = query.eq('user_id', user.id);
-    }
+      .neq('status', 'deleted')
+      .eq('user_id', user.id);
 
     const { data: receipts, error } = await query;
 

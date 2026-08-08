@@ -1,4 +1,5 @@
 import { Receipt, UserStats, UserProfile } from './types';
+import { supabase } from './supabase';
 
 const EF_BASE = (process.env.NEXT_PUBLIC_SUPABASE_URL || '') + '/functions/v1';
 
@@ -11,8 +12,13 @@ export class ApiError extends Error {
 
 async function callEdgeFunction<T>(name: string, body: FormData | unknown, isFormData = false, userToken?: string): Promise<T> {
   const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+  
+  // Estrae in modo trasparente l'access token dalla sessione attiva
+  const { data: { session } } = await supabase.auth.getSession();
+  const activeToken = userToken || session?.access_token || anonKey;
+
   const headers: Record<string, string> = {
-    'Authorization': userToken ? `Bearer ${userToken}` : `Bearer ${anonKey}`,
+    'Authorization': `Bearer ${activeToken}`,
     'apikey': anonKey,
   };
   if (!isFormData) {

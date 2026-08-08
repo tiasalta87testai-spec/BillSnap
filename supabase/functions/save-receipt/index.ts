@@ -149,6 +149,9 @@ Deno.serve(async (req: Request) => {
 
   try {
     const user = await getAuthenticatedUser(req);
+    if (!user) {
+      return errorResponse(req, 'Utente non autenticato. Accesso negato.', 401, 'UNAUTHORIZED');
+    }
     const body = await req.json();
 
     const {

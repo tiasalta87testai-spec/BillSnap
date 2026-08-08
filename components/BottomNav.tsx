@@ -8,6 +8,8 @@ import styles from './BottomNav.module.css';
 export default function BottomNav() {
   const pathname = usePathname();
 
+  if (pathname === '/login') return null;
+
   const isHome = pathname === '/' || pathname === '/review';
   const isHistory = pathname.startsWith('/history') || pathname.startsWith('/receipt');
   const isStats = pathname.startsWith('/stats');
