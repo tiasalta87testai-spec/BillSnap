@@ -89,6 +89,8 @@ export interface Receipt {
   thumbnail_path?: string | null;
   image_url?: string | null;
   cloud_sync_status?: 'pending' | 'synced' | 'failed';
+  cloud_file_id?: string | null;
+  cloud_file_url?: string | null;
   raw_ai_response?: Record<string, unknown> | null;
   raw_text?: string | null;
   extraction_confidence?: ExtractionConfidence | null;
