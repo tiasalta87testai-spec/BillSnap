@@ -258,16 +258,18 @@ export default function AdminPage() {
                 key={u.id}
                 style={{
                   display: 'flex',
+                  flexWrap: 'wrap',
                   alignItems: 'center',
                   justifyContent: 'space-between',
+                  gap: '12px',
                   padding: '12px 14px',
                   borderRadius: '10px',
                   background: 'rgba(255,255,255,0.03)',
                   border: '1px solid rgba(255,255,255,0.05)',
                 }}
               >
-                <div>
-                  <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--color-on-surface, #f1f5f9)' }}>
+                <div style={{ flex: '1 1 180px', minWidth: 0, overflow: 'hidden' }}>
+                  <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--color-on-surface, #f1f5f9)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                     {u.email}
                   </div>
                   <div style={{ fontSize: '12px', color: 'var(--color-secondary, #94a3b8)', marginTop: '2px' }}>
@@ -275,7 +277,7 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', flexShrink: 0 }}>
                   <span
                     style={{
                       fontSize: '12px',
@@ -302,6 +304,7 @@ export default function AdminPage() {
                       backgroundColor: 'var(--color-surface-container-high, #1c2742)',
                       color: '#f8fafc',
                       cursor: 'pointer',
+                      whiteSpace: 'nowrap',
                     }}
                   >
                     {updatingId === u.id ? 'Aggiornamento...' : `Cambia in ${u.role === 'Admin' ? 'Operatore' : 'Admin'}`}
@@ -324,15 +327,15 @@ export default function AdminPage() {
         </p>
 
         {/* STATUS COLLEGAMENTO DRIVE */}
-        <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div>
-            <div style={{ fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px' }}>
-              Stato Connessione Google Drive:
-              <span style={{ color: hasCredentials ? '#10b981' : '#f59e0b', fontSize: '13px' }}>
+        <div style={{ padding: '14px', borderRadius: '10px', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)', marginBottom: '16px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+          <div style={{ flex: '1 1 200px', minWidth: 0 }}>
+            <div style={{ fontSize: '14px', fontWeight: 600, display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px' }}>
+              <span>Stato Connessione Google Drive:</span>
+              <span style={{ color: hasCredentials ? '#10b981' : '#f59e0b', fontSize: '13px', fontWeight: 600 }}>
                 {hasCredentials ? '● Collegato' : '○ Non collegato'}
               </span>
             </div>
-            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '2px' }}>
+            <div style={{ fontSize: '12px', color: '#94a3b8', marginTop: '4px' }}>
               {hasCredentials ? 'Token di autorizzazione Google memorizzato ed attivo.' : 'Autorizza l\'accesso a Google Drive per abilitare il backup.'}
             </div>
           </div>
@@ -352,6 +355,8 @@ export default function AdminPage() {
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              whiteSpace: 'nowrap',
+              flexShrink: 0
             }}
           >
             <ExternalLink size={14} />
