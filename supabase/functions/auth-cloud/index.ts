@@ -63,16 +63,19 @@ Deno.serve(async (req: Request) => {
 
       const { data: existing } = await supabase
         .from('cloud_settings')
-        .select('id')
+        .select('id, credentials')
         .limit(1)
         .maybeSingle();
 
+      const existingCredentials = existing?.credentials || {};
+
       const credentials = {
+        ...existingCredentials,
         access_token: tokenData.access_token,
-        refresh_token: tokenData.refresh_token,
+        refresh_token: tokenData.refresh_token || existingCredentials.refresh_token,
         expires_at: Date.now() + (tokenData.expires_in * 1000),
-        token_type: tokenData.token_type,
-        scope: tokenData.scope,
+        token_type: tokenData.token_type || existingCredentials.token_type,
+        scope: tokenData.scope || existingCredentials.scope,
       };
 
       if (existing) {
